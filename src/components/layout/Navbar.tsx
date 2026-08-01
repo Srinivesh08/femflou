@@ -18,7 +18,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   showSidebarToggle = true,
 }) => {
   const location = useLocation();
-  const publicRoutes = ['/', '/login', '/technology', '/about'];
+  const publicRoutes = ['/', '/login', '/forgot-password', '/technology', '/about'];
   const isAuthenticatedRoute = !publicRoutes.includes(location.pathname);
 
   return (

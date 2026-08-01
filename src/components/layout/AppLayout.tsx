@@ -3,8 +3,8 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { Navbar } from './Navbar';
 import { Sidebar } from './Sidebar';
 
-const PUBLIC_ROUTES = ['/', '/login', '/technology', '/about'];
-const FULL_BLEED_ROUTES = ['/', '/technology', '/about'];
+const PUBLIC_ROUTES = ['/', '/login', '/forgot-password', '/technology', '/about'];
+const FULL_BLEED_ROUTES = ['/', '/login', '/forgot-password', '/technology', '/about'];
 
 export const AppLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);

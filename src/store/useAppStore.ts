@@ -1,10 +1,12 @@
 import { create } from 'zustand';
 
-interface User {
+export type UserRole = 'patient' | 'doctor' | 'researcher' | 'admin';
+
+export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'doctor' | 'admin' | 'technician';
+  role: UserRole;
 }
 
 interface AppState {

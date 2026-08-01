@@ -1,7 +1,7 @@
 import React from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { AppLayout } from '@/components/layout';
-import { HomePage, LoginPage, PlaceholderPage, TechnologyPage } from '@/pages';
+import { HomePage, LoginPage, ForgotPasswordPage, PlaceholderPage, TechnologyPage } from '@/pages';
 
 const router = createBrowserRouter([
   {
@@ -14,6 +14,10 @@ const router = createBrowserRouter([
       {
         path: '/login',
         element: <LoginPage />,
+      },
+      {
+        path: '/forgot-password',
+        element: <ForgotPasswordPage />,
       },
       {
         path: '/technology',
