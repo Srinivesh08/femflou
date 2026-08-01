@@ -1,16 +1,17 @@
 import React from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard,
   Upload,
   History,
-  Settings,
   BarChart3,
-  Stethoscope,
+  User,
+  LogOut,
   ChevronLeft,
   X,
 } from 'lucide-react';
+import { useAppStore } from '@/store/useAppStore';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -21,10 +22,9 @@ interface SidebarProps {
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/upload', label: 'Upload', icon: Upload },
-  { to: '/history', label: 'History', icon: History },
-  { to: '/calibration', label: 'Calibration', icon: BarChart3 },
-  { to: '/doctor-portal', label: 'Doctor Portal', icon: Stethoscope },
+  { to: '/upload', label: 'Upload & Analyze', icon: Upload },
+  { to: '/history', label: 'Results History', icon: History },
+  { to: '/calibration', label: 'Calibration Data', icon: BarChart3 },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -34,10 +34,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
 }) => {
   const location = useLocation();
-  const isAuthenticatedRoute =
-    location.pathname !== '/' && location.pathname !== '/login';
+  const navigate = useNavigate();
+  const logout = useAppStore((state) => state.logout);
+  
+  const publicRoutes = ['/', '/login', '/forgot-password', '/technology', '/about'];
+  const isAuthenticatedRoute = !publicRoutes.includes(location.pathname);
 
   if (!isAuthenticatedRoute) return null;
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+    onClose();
+  };
 
   return (
     <>
@@ -119,7 +128,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   )}
                   <item.icon className="w-5 h-5 flex-shrink-0" />
                   {!isCollapsed && (
-                    <span className="hidden lg:block">{item.label}</span>
+                    <span className="hidden lg:block whitespace-nowrap">{item.label}</span>
                   )}
                   <span className="lg:hidden">{item.label}</span>
 
@@ -141,21 +150,59 @@ export const Sidebar: React.FC<SidebarProps> = ({
           ))}
         </nav>
 
-        {/* Footer */}
-        <div className="px-3 py-3 border-t border-border/40">
+        {/* Footer Navigation (Profile & Logout) */}
+        <div className="px-3 py-3 border-t border-border/40 space-y-1">
           <NavLink
-            to="/calibration"
-            className={`
+            to="/profile"
+            onClick={onClose}
+            className={({ isActive }) => `
               flex items-center gap-3 px-3 py-2.5 rounded-xl
-              text-body-sm font-medium text-muted
-              hover:text-foreground hover:bg-gray-100/80 transition-all
+              text-body-sm font-medium transition-all duration-200 group relative
+              ${isActive ? 'bg-primary/10 text-primary' : 'text-muted hover:text-foreground hover:bg-gray-100/80'}
               ${isCollapsed ? 'lg:justify-center lg:px-2' : ''}
             `}
           >
-            <Settings className="w-5 h-5 flex-shrink-0" />
-            {!isCollapsed && <span className="hidden lg:block">Settings</span>}
-            <span className="lg:hidden">Settings</span>
+            <User className="w-5 h-5 flex-shrink-0" />
+            {!isCollapsed && <span className="hidden lg:block whitespace-nowrap">Profile</span>}
+            <span className="lg:hidden">Profile</span>
+            
+            {isCollapsed && (
+              <span className="
+                absolute left-full ml-2 px-2 py-1 text-xs font-medium
+                bg-foreground text-white rounded-md
+                opacity-0 invisible group-hover:opacity-100 group-hover:visible
+                transition-all duration-200 whitespace-nowrap
+                hidden lg:block z-50
+              ">
+                Profile
+              </span>
+            )}
           </NavLink>
+
+          <button
+            onClick={handleLogout}
+            className={`
+              w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
+              text-body-sm font-medium text-critical hover:bg-critical/10 transition-all duration-200 group relative
+              ${isCollapsed ? 'lg:justify-center lg:px-2' : ''}
+            `}
+          >
+            <LogOut className="w-5 h-5 flex-shrink-0" />
+            {!isCollapsed && <span className="hidden lg:block whitespace-nowrap">Logout</span>}
+            <span className="lg:hidden">Logout</span>
+            
+            {isCollapsed && (
+              <span className="
+                absolute left-full ml-2 px-2 py-1 text-xs font-medium
+                bg-foreground text-white rounded-md
+                opacity-0 invisible group-hover:opacity-100 group-hover:visible
+                transition-all duration-200 whitespace-nowrap
+                hidden lg:block z-50
+              ">
+                Logout
+              </span>
+            )}
+          </button>
         </div>
       </motion.aside>
     </>

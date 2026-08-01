@@ -1,7 +1,7 @@
 import React from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { AppLayout } from '@/components/layout';
-import { HomePage, LoginPage, ForgotPasswordPage, PlaceholderPage, TechnologyPage } from '@/pages';
+import { HomePage, LoginPage, ForgotPasswordPage, DashboardPage, UploadPage, PlaceholderPage, TechnologyPage } from '@/pages';
 
 const router = createBrowserRouter([
   {
@@ -29,21 +29,11 @@ const router = createBrowserRouter([
       },
       {
         path: '/dashboard',
-        element: (
-          <PlaceholderPage
-            title="Dashboard"
-            description="Your screening overview and analytics will appear here."
-          />
-        ),
+        element: <DashboardPage />,
       },
       {
         path: '/upload',
-        element: (
-          <PlaceholderPage
-            title="Upload"
-            description="Upload patient data and imaging for AI-powered analysis."
-          />
-        ),
+        element: <UploadPage />,
       },
       {
         path: '/results/:id',

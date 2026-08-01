@@ -8,6 +8,8 @@ import {
   User,
 } from 'lucide-react';
 
+import { useAppStore } from '@/store/useAppStore';
+
 interface NavbarProps {
   onToggleSidebar: () => void;
   showSidebarToggle?: boolean;
@@ -18,6 +20,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   showSidebarToggle = true,
 }) => {
   const location = useLocation();
+  const user = useAppStore((state) => state.user);
   const publicRoutes = ['/', '/login', '/forgot-password', '/technology', '/about'];
   const isAuthenticatedRoute = !publicRoutes.includes(location.pathname);
 
@@ -81,15 +84,20 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
             <div className="w-px h-6 bg-border mx-1.5 hidden sm:block" />
             <button
-              className="flex items-center gap-2 p-1.5 pr-3 rounded-xl hover:bg-gray-100/80 transition-colors"
+              className="flex items-center gap-2 p-1.5 pr-3 rounded-xl hover:bg-gray-100/80 transition-colors text-left"
               aria-label="User menu"
             >
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center flex-shrink-0">
                 <User className="w-4 h-4 text-white" />
               </div>
-              <span className="text-body-sm font-medium text-foreground hidden sm:block">
-                Dr. User
-              </span>
+              <div className="hidden sm:block">
+                <span className="block text-body-sm font-semibold text-foreground leading-none">
+                  {user?.name || 'User'}
+                </span>
+                <span className="block text-[0.65rem] text-muted capitalize mt-1 leading-none">
+                  {user?.role || 'Patient'}
+                </span>
+              </div>
             </button>
           </>
         )}
