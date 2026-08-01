@@ -1,0 +1,136 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        primary: {
+          DEFAULT: '#0F766E',
+          50: '#E6F5F4',
+          100: '#CCEBE9',
+          200: '#99D7D3',
+          300: '#66C3BD',
+          400: '#33AFA7',
+          500: '#0F766E',
+          600: '#0C5F58',
+          700: '#094842',
+          800: '#06302C',
+          900: '#031816',
+        },
+        secondary: {
+          DEFAULT: '#2563EB',
+          50: '#EBF1FE',
+          100: '#D6E4FD',
+          200: '#ADC8FB',
+          300: '#85ADF9',
+          400: '#5C91F7',
+          500: '#2563EB',
+          600: '#1E4FBC',
+          700: '#163B8D',
+          800: '#0F285E',
+          900: '#07142F',
+        },
+        accent: {
+          DEFAULT: '#06B6D4',
+          50: '#E5F7FA',
+          100: '#CCEFF5',
+          200: '#99DFEB',
+          300: '#66CFE1',
+          400: '#33BFD7',
+          500: '#06B6D4',
+          600: '#0592AA',
+          700: '#046D7F',
+          800: '#024955',
+          900: '#01242A',
+        },
+        success: {
+          DEFAULT: '#22C55E',
+          50: '#EAFBF0',
+          500: '#22C55E',
+          600: '#16A34A',
+        },
+        warning: {
+          DEFAULT: '#F59E0B',
+          50: '#FEF6E5',
+          500: '#F59E0B',
+          600: '#D97706',
+        },
+        critical: {
+          DEFAULT: '#EF4444',
+          50: '#FDE8E8',
+          500: '#EF4444',
+          600: '#DC2626',
+        },
+        background: '#F8FAFC',
+        surface: '#FFFFFF',
+        foreground: '#0F172A',
+        muted: {
+          DEFAULT: '#64748B',
+          foreground: '#94A3B8',
+        },
+        border: '#E2E8F0',
+      },
+      fontFamily: {
+        sans: ['Inter', 'Manrope', 'IBM Plex Sans', 'system-ui', 'sans-serif'],
+      },
+      fontSize: {
+        'display': ['3.5rem', { lineHeight: '1.1', letterSpacing: '-0.02em', fontWeight: '700' }],
+        'h1': ['2.25rem', { lineHeight: '1.2', letterSpacing: '-0.02em', fontWeight: '700' }],
+        'h2': ['1.875rem', { lineHeight: '1.25', letterSpacing: '-0.01em', fontWeight: '600' }],
+        'h3': ['1.5rem', { lineHeight: '1.3', letterSpacing: '-0.01em', fontWeight: '600' }],
+        'h4': ['1.25rem', { lineHeight: '1.4', fontWeight: '600' }],
+        'body-lg': ['1.125rem', { lineHeight: '1.6' }],
+        'body': ['1rem', { lineHeight: '1.6' }],
+        'body-sm': ['0.875rem', { lineHeight: '1.5' }],
+        'caption': ['0.75rem', { lineHeight: '1.4' }],
+      },
+      borderRadius: {
+        'xl': '0.75rem',
+        '2xl': '1rem',
+        '3xl': '1.5rem',
+      },
+      boxShadow: {
+        'soft': '0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.03)',
+        'medium': '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.03)',
+        'elevated': '0 10px 25px -3px rgba(0, 0, 0, 0.06), 0 4px 10px -4px rgba(0, 0, 0, 0.04)',
+        'glass': '0 8px 32px rgba(0, 0, 0, 0.06)',
+      },
+      backdropBlur: {
+        'glass': '16px',
+      },
+      animation: {
+        'fade-in': 'fadeIn 0.5s ease-out',
+        'slide-up': 'slideUp 0.5s ease-out',
+        'slide-in-right': 'slideInRight 0.3s ease-out',
+        'progress': 'progress 1s ease-out forwards',
+        'pulse-soft': 'pulseSoft 2s ease-in-out infinite',
+      },
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        slideUp: {
+          '0%': { opacity: '0', transform: 'translateY(10px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        slideInRight: {
+          '0%': { opacity: '0', transform: 'translateX(-10px)' },
+          '100%': { opacity: '1', transform: 'translateX(0)' },
+        },
+        progress: {
+          '0%': { width: '0%' },
+          '100%': { width: 'var(--progress-width)' },
+        },
+        pulseSoft: {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.7' },
+        },
+      },
+    },
+  },
+  plugins: [],
+}

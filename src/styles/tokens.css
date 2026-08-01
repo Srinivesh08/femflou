@@ -1,0 +1,41 @@
+/* ============================================
+   FEMFLOU Design System — Component Tokens
+   Reusable variables for UI components
+   ============================================ */
+
+:root {
+  /* Button */
+  --btn-height-sm: 2rem;
+  --btn-height-md: 2.5rem;
+  --btn-height-lg: 3rem;
+  --btn-padding-x-sm: 0.75rem;
+  --btn-padding-x-md: 1.25rem;
+  --btn-padding-x-lg: 1.75rem;
+  --btn-font-sm: 0.8125rem;
+  --btn-font-md: 0.875rem;
+  --btn-font-lg: 1rem;
+
+  /* Input */
+  --input-height: 2.5rem;
+  --input-padding-x: 0.75rem;
+  --input-border-color: var(--color-border);
+  --input-focus-border: var(--color-primary);
+  --input-bg: var(--color-surface);
+
+  /* Card */
+  --card-padding: 1.5rem;
+  --card-radius: var(--radius-2xl);
+  --card-bg: var(--color-surface);
+  --card-border: var(--color-border);
+
+  /* Badge */
+  --badge-normal: #22C55E;
+  --badge-mild: #F59E0B;
+  --badge-high: #F97316;
+  --badge-critical: #EF4444;
+
+  /* Modal */
+  --modal-overlay: rgba(15, 23, 42, 0.5);
+  --modal-radius: var(--radius-2xl);
+  --modal-max-width: 32rem;
+}
