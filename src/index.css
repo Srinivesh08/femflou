@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #f8fafc;
+    --foreground: #0f172a;
+    
+    --primary: #0f766e;
+    --primary-foreground: #ffffff;
+    
+    --secondary: #2563eb;
+    --secondary-foreground: #ffffff;
+    
+    --accent: #06b6d4;
+    --accent-foreground: #ffffff;
+
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --critical: #ef4444;
+
+    --muted: #64748b;
+    --muted-foreground: #f8fafc;
+
+    --border: #e2e8f0;
+    --surface: #ffffff;
+  }
+
+  .dark {
+    --background: #020617;
+    --foreground: #f8fafc;
+    
+    --primary: #0d9488;
+    --secondary: #3b82f6;
+    --accent: #06b6d4;
+
+    --muted: #94a3b8;
+    --border: #1e293b;
+    --surface: #0f172a;
+  }
+}
+
+@layer utilities {
+  .text-h1 {
+    @apply text-4xl sm:text-5xl font-extrabold tracking-tight;
+  }
+  .text-h2 {
+    @apply text-3xl sm:text-4xl font-bold tracking-tight;
+  }
+  .text-h3 {
+    @apply text-2xl sm:text-3xl font-bold tracking-tight;
+  }
+  .text-body-lg {
+    @apply text-lg text-muted font-normal;
+  }
+  .text-body {
+    @apply text-base text-foreground font-normal;
+  }
+  .text-body-sm {
+    @apply text-sm text-foreground font-normal;
+  }
+
+  .glass-panel {
+    @apply bg-surface/70 backdrop-blur-xl border border-white/20 shadow-soft;
+  }
+  
+  .glass-strong {
+    @apply bg-surface/90 backdrop-blur-2xl border border-white/40 shadow-elevated;
+  }
+
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary via-secondary to-accent;
+  }
+
+  .gradient-primary {
+    @apply bg-gradient-to-r from-primary to-accent;
+  }
+  
+  .shadow-soft {
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+  }
+  
+  .shadow-elevated {
+    box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.1), 0 4px 10px -4px rgba(0, 0, 0, 0.05);
+  }
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  body {
+    background-color: white !important;
+    color: black !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  
+  .print-hidden {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .break-inside-avoid {
+    break-inside: avoid;
+  }
+  
+  @page {
+    margin: 1.5cm;
+    size: A4 portrait;
+  }
+}

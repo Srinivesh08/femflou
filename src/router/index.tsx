@@ -1,7 +1,7 @@
 import React from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { AppLayout } from '@/components/layout';
-import { HomePage, LoginPage, ForgotPasswordPage, DashboardPage, UploadPage, PlaceholderPage, TechnologyPage } from '@/pages';
+import { HomePage, LoginPage, ForgotPasswordPage, DashboardPage, UploadPage, ResultsPage, CalibrationPage, HistoryPage, DoctorPortalPage, PlaceholderPage, TechnologyPage } from '@/pages';
 
 const router = createBrowserRouter([
   {
@@ -37,39 +37,19 @@ const router = createBrowserRouter([
       },
       {
         path: '/results/:id',
-        element: (
-          <PlaceholderPage
-            title="Results"
-            description="Detailed screening results and risk assessment will be displayed here."
-          />
-        ),
+        element: <ResultsPage />,
       },
       {
         path: '/calibration',
-        element: (
-          <PlaceholderPage
-            title="Calibration"
-            description="Model calibration and configuration settings."
-          />
-        ),
+        element: <CalibrationPage />,
       },
       {
         path: '/history',
-        element: (
-          <PlaceholderPage
-            title="History"
-            description="Browse and search your past screening records."
-          />
-        ),
+        element: <HistoryPage />,
       },
       {
         path: '/doctor-portal',
-        element: (
-          <PlaceholderPage
-            title="Doctor Portal"
-            description="Clinician-facing tools and patient management."
-          />
-        ),
+        element: <DoctorPortalPage />,
       },
       {
         path: '/privacy',
