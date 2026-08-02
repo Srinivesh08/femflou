@@ -41,7 +41,9 @@ export const Card: React.FC<CardProps> = ({
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: 'easeOut' }}
+      whileHover={onClick || hover ? { scale: 1.01 } : {}}
+      whileTap={onClick ? { scale: 0.98 } : {}}
+      transition={{ duration: 0.4, ease: 'easeOut', scale: { duration: 0.15 } }}
       className={baseClasses}
       onClick={onClick}
     >

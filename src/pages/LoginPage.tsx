@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, Mail, ShieldCheck, Chrome } from 'lucide-react';
+import { Lock, Mail, ShieldCheck, Chrome, User as UserIcon } from 'lucide-react';
 import { Button, Input } from '@/components/ui';
+import DisclaimerBanner from '@/components/landing/DisclaimerBanner';
 import { useAppStore, UserRole } from '@/store/useAppStore';
+import { useLogin, useRegister } from '@/hooks/queries';
 
 const ROLES: { id: UserRole; label: string }[] = [
   { id: 'patient', label: 'Patient' },
@@ -16,16 +18,20 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const setUser = useAppStore((state) => state.setUser);
 
+  const loginMutation = useLogin();
+  const registerMutation = useRegister();
+
   // Form State
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [name, setName] = useState('');
   const [step, setStep] = useState<1 | 2>(1);
-  const [role, setRole] = useState<UserRole>('doctor');
+  const [role, setRole] = useState<UserRole>('patient');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [otp, setOtp] = useState('');
+  const [otp, setOtp] = useState('123456'); // Hardcoded OTP for mock 2FA step
   
   // Validation / UI State
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [countdown, setCountdown] = useState(30);
 
   // Timer for 2FA resend
@@ -39,10 +45,10 @@ const LoginPage: React.FC = () => {
     return () => clearInterval(timer);
   }, [step, countdown]);
 
-  const handleCredentialsSubmit = (e: React.FormEvent) => {
+  const handleCredentialsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-      setError('Please fill in all fields');
+    if (!email || !password || (isRegistering && !name)) {
+      setError('Please fill in all required fields');
       return;
     }
     if (!/\S+@\S+\.\S+/.test(email)) {
@@ -50,17 +56,22 @@ const LoginPage: React.FC = () => {
       return;
     }
     setError('');
-    setIsLoading(true);
     
-    // Mock network delay
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      if (isRegistering) {
+        await registerMutation.mutateAsync({ name, email, password, role: role.toUpperCase() });
+      } else {
+        await loginMutation.mutateAsync({ email, password });
+      }
+      // If success, move to 2FA mock step
       setStep(2);
       setCountdown(30);
-    }, 800);
+    } catch (err: any) {
+      setError(err.response?.data?.error?.message || 'Authentication failed');
+    }
   };
 
-  const handle2FASubmit = (e: React.FormEvent) => {
+  const handle2FASubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (otp.length < 6) {
       setError('Please enter a valid 6-digit code');
@@ -68,32 +79,51 @@ const LoginPage: React.FC = () => {
     }
     
     setError('');
-    setIsLoading(true);
 
-    // Mock network delay & login
-    setTimeout(() => {
-      setIsLoading(false);
+    // In a real app, verify OTP here. We just log the user in using the token from earlier.
+    // Wait, we need the token from the first step. Let's just do it directly on step 1 actually.
+    // Let's refactor: bypass 2FA for now and login directly on step 1 since backend doesn't have 2FA endpoint.
+  };
+
+  const handleDirectLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password || (isRegistering && !name)) {
+      setError('Please fill in all required fields');
+      return;
+    }
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+    setError('');
+    
+    try {
+      let data;
+      if (isRegistering) {
+        data = await registerMutation.mutateAsync({ name, email, password, role: role.toUpperCase() });
+      } else {
+        data = await loginMutation.mutateAsync({ email, password });
+      }
       
-      // Store mock user in Zustand
       setUser({
-        id: Math.random().toString(36).substring(7),
-        name: email.split('@')[0].replace('.', ' '),
-        email,
-        role,
-      });
+        id: data.user.id,
+        name: data.user.name,
+        email: data.user.email,
+        role: data.user.role.toLowerCase() as UserRole,
+      }, data.token);
 
-      // Redirect based on role
-      if (role === 'admin') {
-        navigate('/doctor-portal'); // Admin goes to doctor-portal in this mock, or could be /admin
+      if (data.user.role === 'DOCTOR' || data.user.role === 'ADMIN') {
+        navigate('/doctor-portal');
       } else {
         navigate('/dashboard');
       }
-    }, 800);
+    } catch (err: any) {
+      setError(err.response?.data?.error?.message || 'Authentication failed');
+    }
   };
 
   const resendCode = () => {
     setCountdown(30);
-    // Mock sending code
   };
 
   return (
@@ -158,8 +188,10 @@ const LoginPage: React.FC = () => {
                 transition={{ duration: 0.3 }}
               >
                 <div className="mb-8">
-                  <h2 className="text-h2 text-foreground mb-2">Welcome back</h2>
-                  <p className="text-body-sm text-muted">Please enter your details to sign in.</p>
+                  <h2 className="text-h2 text-foreground mb-2">{isRegistering ? 'Create Account' : 'Welcome back'}</h2>
+                  <p className="text-body-sm text-muted">
+                    {isRegistering ? 'Please enter your details to sign up.' : 'Please enter your details to sign in.'}
+                  </p>
                 </div>
 
                 {/* Role Selector Tabs */}
@@ -200,7 +232,17 @@ const LoginPage: React.FC = () => {
                   </div>
                 </div>
 
-                <form className="space-y-4" onSubmit={handleCredentialsSubmit}>
+                <form className="space-y-4" onSubmit={handleDirectLogin}>
+                  {isRegistering && (
+                    <Input
+                      label="Full Name"
+                      type="text"
+                      placeholder="Jane Doe"
+                      value={name}
+                      onChange={(e) => { setName(e.target.value); setError(''); }}
+                      leftIcon={<UserIcon className="w-4 h-4" />}
+                    />
+                  )}
                   <Input
                     label="Email"
                     type="email"
@@ -220,17 +262,29 @@ const LoginPage: React.FC = () => {
                       leftIcon={<Lock className="w-4 h-4" />}
                       error={error && password ? error : undefined}
                     />
-                    <Link
-                      to="/forgot-password"
-                      className="absolute right-0 top-0 text-[0.8125rem] font-medium text-primary hover:text-primary-600 transition-colors"
-                    >
-                      Forgot password?
-                    </Link>
+                    {!isRegistering && (
+                      <Link
+                        to="/forgot-password"
+                        className="absolute right-0 top-0 text-[0.8125rem] font-medium text-primary hover:text-primary-600 transition-colors"
+                      >
+                        Forgot password?
+                      </Link>
+                    )}
                   </div>
 
-                  <Button fullWidth size="lg" type="submit" isLoading={isLoading} className="mt-2">
-                    Sign In
+                  <Button fullWidth size="lg" type="submit" isLoading={loginMutation.isPending || registerMutation.isPending} className="mt-2">
+                    {isRegistering ? 'Sign Up' : 'Sign In'}
                   </Button>
+                  
+                  <div className="text-center mt-4">
+                    <button
+                      type="button"
+                      onClick={() => { setIsRegistering(!isRegistering); setError(''); }}
+                      className="text-[0.8125rem] text-primary hover:text-primary-600 font-medium transition-colors"
+                    >
+                      {isRegistering ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+                    </button>
+                  </div>
                 </form>
               </motion.div>
             ) : (
@@ -299,11 +353,9 @@ const LoginPage: React.FC = () => {
             )}
           </AnimatePresence>
 
-          <p className="text-center text-xs text-muted/60 mt-12 max-w-xs mx-auto leading-relaxed">
-            By signing in, you agree to our Terms of Service and Privacy Policy.
-            <br />
-            For research and screening purposes only. Not a diagnostic device.
-          </p>
+          <div className="mt-12 w-full max-w-sm mx-auto">
+            <DisclaimerBanner />
+          </div>
         </div>
       </div>
     </div>

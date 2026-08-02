@@ -3,6 +3,8 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { Navbar } from './Navbar';
 import { Sidebar } from './Sidebar';
 
+import { motion, AnimatePresence } from 'framer-motion';
+
 const PUBLIC_ROUTES = ['/', '/login', '/forgot-password', '/technology', '/about'];
 const FULL_BLEED_ROUTES = ['/', '/login', '/forgot-password', '/technology', '/about'];
 
@@ -14,6 +16,11 @@ export const AppLayout: React.FC = () => {
   const isPublicRoute = PUBLIC_ROUTES.includes(location.pathname);
   const isFullBleed = FULL_BLEED_ROUTES.includes(location.pathname);
   const isAuthenticatedRoute = !isPublicRoute;
+
+  // Make sure to close sidebar on navigation on mobile
+  React.useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -31,7 +38,7 @@ export const AppLayout: React.FC = () => {
 
       <main
         className={`
-          min-h-screen transition-all duration-300
+          min-h-screen transition-all duration-300 w-full overflow-x-hidden
           ${isFullBleed ? '' : 'pt-16'}
           ${
             isAuthenticatedRoute
@@ -43,7 +50,18 @@ export const AppLayout: React.FC = () => {
         `}
       >
         <div className={`${isAuthenticatedRoute ? 'p-4 md:p-6 lg:p-8' : ''}`}>
-          <Outlet />
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
+              className="w-full h-full"
+            >
+              <Outlet />
+            </motion.div>
+          </AnimatePresence>
         </div>
       </main>
     </div>

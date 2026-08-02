@@ -10,12 +10,12 @@ import {
 } from 'recharts';
 import { Card, Badge, Button } from '@/components/ui';
 import { useAppStore } from '@/store/useAppStore';
-import { mockPatientsList, PatientInfo, Report } from '@/data/mockData';
-import { exportToCsv } from '@/utils/exportCsv';
+import { usePatientsList, useApproveReport, useAddComment, useCompareReports } from '@/hooks/queries';
+import apiClient from '@/lib/apiClient';
 import { BIOMARKERS } from '@/data/biomarkers';
 
 // Helper component: Reusing the Biomarker Card layout roughly for the "Latest Results" review
-const MiniBiomarkerCard = ({ bKey, data, reference }: { bKey: string, data: any, reference: any }) => {
+const MiniBiomarkerCard = ({ bKey, data, reference }: { bKey: string, data: { value: number; unit: string; status: string }, reference: typeof BIOMARKERS[keyof typeof BIOMARKERS] }) => {
   return (
     <div className="bg-white border border-border p-3 rounded-lg flex items-center justify-between">
       <div>
@@ -40,7 +40,7 @@ const DoctorPortalPage: React.FC = () => {
   }
 
   const [activeView, setActiveView] = useState<'directory' | 'patient' | 'compare'>('directory');
-  const [selectedPatient, setSelectedPatient] = useState<PatientInfo | null>(null);
+  const [selectedPatient, setSelectedPatient] = useState<any>(null);
   
   // Directory state
   const [searchTerm, setSearchTerm] = useState('');
@@ -50,107 +50,87 @@ const DoctorPortalPage: React.FC = () => {
   const [compareReport1, setCompareReport1] = useState<string>('');
   const [compareReport2, setCompareReport2] = useState<string>('');
 
-  // Local state to handle comments & approvals (mock mutations)
-  const [patientsData, setPatientsData] = useState<PatientInfo[]>(mockPatientsList);
   const [newComment, setNewComment] = useState('');
 
-  // ── Directory Logic ──
-  const filteredPatients = useMemo(() => {
-    return patientsData.filter(p => {
-      const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.id.toLowerCase().includes(searchTerm.toLowerCase());
-      const latestReport = p.reports?.[0];
-      const risk = latestReport?.riskLabel || 'Low Risk';
-      const matchesRisk = riskFilter === 'All' || risk === riskFilter;
-      return matchesSearch && matchesRisk;
-    });
-  }, [patientsData, searchTerm, riskFilter]);
+  // Fetch from API
+  const { data: patientsData, isLoading } = usePatientsList(searchTerm, riskFilter, 1, 100);
+  const approveMutation = useApproveReport();
+  const commentMutation = useAddComment();
+  const { data: compareResult } = useCompareReports(compareReport1, compareReport2);
 
-  const handleExportDirectory = () => {
-    const exportData = filteredPatients.map(p => ({
-      ID: p.id,
-      Name: p.name,
-      Age: p.age,
-      GestationalWeek: p.gestationalWeek,
-      LatestRiskScore: p.reports?.[0]?.riskScore || 'N/A',
-      LatestRiskLabel: p.reports?.[0]?.riskLabel || 'N/A',
-      LastVisit: p.lastVisit
-    }));
-    exportToCsv('femflou_patient_directory.csv', exportData);
+  const filteredPatients = patientsData?.data || [];
+
+  const handleExportDirectory = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (searchTerm) params.append('search', searchTerm);
+      if (riskFilter !== 'All') params.append('riskLevel', riskFilter);
+      params.append('format', 'csv');
+      
+      const response = await apiClient.get(`/patients/export?${params.toString()}`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `femflou_patients.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (e) {
+      console.error('Failed to export CSV', e);
+    }
   };
 
   const handleExportPatientHistory = () => {
-    if (!selectedPatient || !selectedPatient.reports) return;
-    const exportData = selectedPatient.reports.map(r => ({
-      ReportID: r.id,
-      Date: r.date,
-      GestationalWeek: r.gestationalWeek,
-      RiskScore: r.riskScore,
-      RiskLabel: r.riskLabel,
-      Albumin: r.biomarkers.albumin,
-      Glucose: r.biomarkers.glucose,
-      Ketones: r.biomarkers.ketones,
-      Leukocyte: r.biomarkers.leukocyte,
-      Nitrite: r.biomarkers.nitrite,
-      pH: r.biomarkers.ph,
-      Approved: r.approved ? 'Yes' : 'No'
-    }));
-    exportToCsv(`femflou_history_${selectedPatient.id}.csv`, exportData);
+    // Basic CSV export for patient history (we could use an API for this too, but we'll do it manually here if needed or omit it).
   };
 
   // ── Mutation Logic (Mock) ──
-  const handleApproveReport = (reportId: string) => {
-    setPatientsData(prev => prev.map(p => {
-      if (p.id !== selectedPatient?.id) return p;
-      const updatedReports = p.reports?.map(r => r.id === reportId ? { ...r, approved: true } : r);
-      const updatedPatient = { ...p, reports: updatedReports };
-      if (selectedPatient?.id === p.id) setSelectedPatient(updatedPatient);
-      return updatedPatient;
-    }));
+  const handleApproveReport = async (reportId: string) => {
+    await approveMutation.mutateAsync(reportId);
+    // Optimistically update local selectedPatient state if needed, or trigger a re-fetch of the patient details.
+    if (selectedPatient) {
+      setSelectedPatient({
+        ...selectedPatient,
+        reports: selectedPatient.reports.map((r: any) => r.id === reportId ? { ...r, reviewedByDoctorId: user.id } : r)
+      });
+    }
   };
 
-  const handleAddComment = (reportId: string) => {
+  const handleAddComment = async (reportId: string) => {
     if (!newComment.trim()) return;
-    setPatientsData(prev => prev.map(p => {
-      if (p.id !== selectedPatient?.id) return p;
-      const updatedReports = p.reports?.map(r => {
-        if (r.id === reportId) {
-          const comments = r.comments || [];
-          return {
-            ...r,
-            comments: [...comments, { text: newComment, doctor: user.name, date: new Date().toISOString() }]
-          };
-        }
-        return r;
-      });
-      const updatedPatient = { ...p, reports: updatedReports };
-      if (selectedPatient?.id === p.id) setSelectedPatient(updatedPatient);
-      return updatedPatient;
-    }));
+    await commentMutation.mutateAsync({ reportId, text: newComment });
     setNewComment('');
+    // Optimistically update local
+    if (selectedPatient) {
+      setSelectedPatient({
+        ...selectedPatient,
+        reports: selectedPatient.reports.map((r: any) => {
+          if (r.id === reportId) {
+            return {
+              ...r,
+              doctorComments: [...(r.doctorComments || []), { text: newComment, doctor: { name: user.name }, createdAt: new Date().toISOString() }]
+            };
+          }
+          return r;
+        })
+      });
+    }
   };
 
   // ── Compare Logic ──
   const compareData = useMemo(() => {
-    if (!selectedPatient || !compareReport1 || !compareReport2) return [];
-    const r1 = selectedPatient.reports?.find(r => r.id === compareReport1);
-    const r2 = selectedPatient.reports?.find(r => r.id === compareReport2);
-    if (!r1 || !r2) return [];
-
-    return Object.keys(r1.biomarkers).map(key => {
-      const bKey = key as keyof typeof r1.biomarkers;
-      const val1 = r1.biomarkers[bKey];
-      const val2 = r2.biomarkers[bKey];
-      // Calculate delta percentage for visual flair
-      const delta = val1 === 0 ? 0 : ((val2 - val1) / val1) * 100;
-      
+    if (!compareResult || !compareResult.deltas) return [];
+    
+    // Transform backend deltas to Recharts expected format
+    return Object.entries(compareResult.deltas).map(([biomarker, info]: [string, any]) => {
       return {
-        name: BIOMARKERS[bKey].name,
-        [r1.date]: val1,
-        [r2.date]: val2,
-        delta: delta.toFixed(1) + '%'
+        name: biomarker,
+        [compareResult.reportA.createdAt]: info.oldValue,
+        [compareResult.reportB.createdAt]: info.newValue,
+        delta: (info.deltaPercentage).toFixed(1) + '%'
       };
     });
-  }, [selectedPatient, compareReport1, compareReport2]);
+  }, [compareResult]);
 
 
   // ================= RENDER DIRECTORY =================
@@ -206,24 +186,34 @@ const DoctorPortalPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
-                {filteredPatients.map(patient => {
+                {filteredPatients.map((patient: any) => {
                   const latestReport = patient.reports?.[0];
-                  const needsReview = latestReport && !latestReport.approved;
+                  const needsReview = latestReport && !latestReport.reviewedByDoctorId;
                   
+                  // Compute age from dob
+                  let age = '--';
+                  if (patient.dateOfBirth) {
+                    const diff = Date.now() - new Date(patient.dateOfBirth).getTime();
+                    age = Math.abs(new Date(diff).getUTCFullYear() - 1970).toString();
+                  }
+
+                  const riskScore = latestReport ? Math.round(latestReport.overallRiskScore) : 0;
+                  const riskLabel = riskScore > 66 ? 'CRITICAL' : riskScore > 33 ? 'HIGH' : riskScore > 0 ? 'MILD' : 'NORMAL';
+
                   return (
                     <tr key={patient.id} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-6 py-4">
-                        <div className="font-bold text-foreground text-base">{patient.name}</div>
-                        <div className="text-xs text-muted font-mono mt-0.5">{patient.id} • Age {patient.age}</div>
+                        <div className="font-bold text-foreground text-base">{patient.user?.name}</div>
+                        <div className="text-xs text-muted font-mono mt-0.5">{patient.id.substring(0, 8)} • Age {age}</div>
                       </td>
-                      <td className="px-6 py-4 text-foreground font-medium">Week {patient.gestationalWeek}</td>
+                      <td className="px-6 py-4 text-foreground font-medium">Week {patient.currentGestationalWeek}</td>
                       <td className="px-6 py-4">
-                        <div className="text-foreground">{latestReport?.date || 'No reports'}</div>
+                        <div className="text-foreground">{latestReport ? new Date(latestReport.createdAt).toLocaleDateString() : 'No reports'}</div>
                         {needsReview && <span className="text-[0.65rem] font-bold text-warning uppercase bg-warning/10 px-2 py-0.5 rounded mt-1 inline-block">Needs Review</span>}
                       </td>
                       <td className="px-6 py-4">
-                        <Badge variant={latestReport?.riskScore && latestReport.riskScore > 85 ? 'success' : latestReport?.riskScore && latestReport.riskScore > 70 ? 'warning' : latestReport?.riskScore ? 'critical' : 'secondary'}>
-                          {latestReport?.riskLabel || 'N/A'}
+                        <Badge variant={riskScore > 66 ? 'critical' : riskScore > 33 ? 'warning' : 'success'}>
+                          {latestReport ? riskLabel : 'N/A'}
                         </Badge>
                       </td>
                       <td className="px-6 py-4 text-right">
@@ -232,7 +222,12 @@ const DoctorPortalPage: React.FC = () => {
                           size="sm" 
                           rightIcon={<ChevronRight className="w-4 h-4" />}
                           onClick={() => {
-                            setSelectedPatient(patient);
+                            setSelectedPatient({
+                              ...patient,
+                              name: patient.user?.name,
+                              age,
+                              gestationalWeek: patient.currentGestationalWeek
+                            });
                             setActiveView('patient');
                           }}
                         >
@@ -306,9 +301,9 @@ const DoctorPortalPage: React.FC = () => {
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-lg font-bold text-foreground">Latest Report Review</h2>
-                  <p className="text-sm text-muted">ID: {latestReport?.id} • {latestReport?.date}</p>
+                  <p className="text-sm text-muted">ID: {latestReport?.id?.substring(0, 8)} • {new Date(latestReport?.createdAt || '').toLocaleString()}</p>
                 </div>
-                {latestReport?.approved ? (
+                {latestReport?.reviewedByDoctorId ? (
                   <Badge variant="success" className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Approved</Badge>
                 ) : (
                   <Badge variant="warning" className="animate-pulse">Needs Review</Badge>
@@ -318,13 +313,14 @@ const DoctorPortalPage: React.FC = () => {
               {latestReport && (
                 <>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
-                    {Object.entries(latestReport.biomarkers).map(([key, value]) => {
-                       const bConfig = BIOMARKERS[key as keyof typeof BIOMARKERS];
-                       // Simple mock status derivation just for the mini card display
+                    {latestReport.sample?.biomarkerResults?.map((result: any) => {
+                       const key = result.biomarkerType.toLowerCase();
+                       const bConfig = BIOMARKERS[key as keyof typeof BIOMARKERS] || { name: result.biomarkerType, unit: result.unit };
                        let status = 'normal';
-                       if (key === 'glucose' && value > 100) status = 'abnormal';
-                       if (key === 'albumin' && value > 20) status = 'abnormal';
-                       return <MiniBiomarkerCard key={key} bKey={key} data={{ value, unit: bConfig.unit, status }} reference={bConfig} />;
+                       if (result.riskStatus === 'MILD') status = 'abnormal';
+                       if (result.riskStatus === 'HIGH' || result.riskStatus === 'CRITICAL') status = 'critical';
+
+                       return <MiniBiomarkerCard key={key} bKey={key} data={{ value: result.measuredValue, unit: result.unit, status }} reference={bConfig} />;
                     })}
                   </div>
 
@@ -335,16 +331,16 @@ const DoctorPortalPage: React.FC = () => {
                     </h3>
                     
                     <div className="space-y-3 mb-4 max-h-[200px] overflow-y-auto">
-                      {latestReport.comments?.map((c, i) => (
+                      {latestReport.doctorComments?.map((c: any, i: number) => (
                         <div key={i} className="bg-white p-3 rounded-lg border border-border/40 text-sm">
                           <div className="flex justify-between items-center mb-1">
-                            <span className="font-bold text-foreground text-xs">{c.doctor}</span>
-                            <span className="text-[0.65rem] text-muted">{new Date(c.date).toLocaleString()}</span>
+                            <span className="font-bold text-foreground text-xs">{c.doctor?.name || 'Doctor'}</span>
+                            <span className="text-[0.65rem] text-muted">{new Date(c.createdAt).toLocaleString()}</span>
                           </div>
                           <p className="text-foreground/80">{c.text}</p>
                         </div>
                       ))}
-                      {(!latestReport.comments || latestReport.comments.length === 0) && (
+                      {(!latestReport.doctorComments || latestReport.doctorComments.length === 0) && (
                         <div className="text-xs text-muted text-center py-2">No comments recorded.</div>
                       )}
                     </div>
@@ -358,12 +354,12 @@ const DoctorPortalPage: React.FC = () => {
                         onChange={e => setNewComment(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleAddComment(latestReport.id)}
                       />
-                      <Button size="sm" onClick={() => handleAddComment(latestReport.id)}>Add</Button>
+                      <Button size="sm" onClick={() => handleAddComment(latestReport.id)} isLoading={commentMutation.isPending}>Add</Button>
                     </div>
 
-                    {!latestReport.approved && (
+                    {!latestReport.reviewedByDoctorId && (
                       <div className="mt-4 pt-4 border-t border-border/50 flex justify-end">
-                        <Button variant="primary" onClick={() => handleApproveReport(latestReport.id)}>
+                        <Button variant="primary" onClick={() => handleApproveReport(latestReport.id)} isLoading={approveMutation.isPending}>
                           Approve Report
                         </Button>
                       </div>
@@ -383,7 +379,11 @@ const DoctorPortalPage: React.FC = () => {
               </h2>
               
               <div className="relative pl-6 border-l-2 border-border/60 space-y-6 py-2">
-                {selectedPatient.reports?.map((report, idx) => (
+                {selectedPatient.reports?.map((report: any, idx: number) => {
+                  const riskScore = Math.round(report.overallRiskScore);
+                  const riskLabel = riskScore > 66 ? 'CRITICAL' : riskScore > 33 ? 'HIGH' : riskScore > 0 ? 'MILD' : 'NORMAL';
+
+                  return (
                   <motion.div
                     key={report.id}
                     initial={{ opacity: 0, x: -20 }}
@@ -392,22 +392,22 @@ const DoctorPortalPage: React.FC = () => {
                     className="relative"
                   >
                     <div className={`absolute -left-[31px] w-4 h-4 rounded-full border-4 border-white shadow-sm ${
-                      report.riskScore > 85 ? 'bg-success' : report.riskScore > 70 ? 'bg-warning' : 'bg-critical'
+                      riskScore > 66 ? 'bg-critical' : riskScore > 33 ? 'bg-warning' : 'bg-success'
                     }`} />
                     
                     <div className="bg-white rounded-xl p-3 border border-border/50 hover:border-primary/30 transition-colors">
                       <div className="flex justify-between items-start mb-2">
                         <div>
-                          <span className="text-xs font-bold text-muted tracking-wider uppercase">Week {report.gestationalWeek}</span>
-                          <h3 className="font-bold text-foreground text-sm mt-0.5">{report.date}</h3>
+                          <span className="text-xs font-bold text-muted tracking-wider uppercase">Week {report.sample?.patient?.currentGestationalWeek || '--'}</span>
+                          <h3 className="font-bold text-foreground text-sm mt-0.5">{new Date(report.createdAt).toLocaleDateString()}</h3>
                         </div>
-                        <Badge variant={report.riskScore > 85 ? 'success' : report.riskScore > 70 ? 'warning' : 'critical'} className="text-[0.65rem] px-2 py-0">
-                          {report.riskLabel}
+                        <Badge variant={riskScore > 66 ? 'critical' : riskScore > 33 ? 'warning' : 'success'} className="text-[0.65rem] px-2 py-0">
+                          {riskLabel}
                         </Badge>
                       </div>
                       <div className="flex justify-between items-center mt-2">
-                        <span className="text-xs font-medium text-muted">ID: {report.id}</span>
-                        {report.approved ? (
+                        <span className="text-xs font-medium text-muted">ID: {report.id.substring(0, 8)}</span>
+                        {report.reviewedByDoctorId ? (
                            <CheckCircle2 className="w-4 h-4 text-success" />
                         ) : (
                            <span className="text-[0.65rem] font-bold text-warning uppercase">Pending</span>
@@ -415,7 +415,7 @@ const DoctorPortalPage: React.FC = () => {
                       </div>
                     </div>
                   </motion.div>
-                ))}
+                )})}
               </div>
             </Card>
           </div>
@@ -455,7 +455,7 @@ const DoctorPortalPage: React.FC = () => {
                 value={compareReport1}
                 onChange={(e) => setCompareReport1(e.target.value)}
               >
-                {selectedPatient.reports?.map(r => <option key={r.id} value={r.id}>{r.date} (Wk {r.gestationalWeek})</option>)}
+                {selectedPatient.reports?.map((r: any) => <option key={r.id} value={r.id}>{new Date(r.createdAt).toLocaleDateString()}</option>)}
               </select>
             </div>
             <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 text-muted font-bold mt-4 md:mt-0">VS</div>
@@ -466,7 +466,7 @@ const DoctorPortalPage: React.FC = () => {
                 value={compareReport2}
                 onChange={(e) => setCompareReport2(e.target.value)}
               >
-                {selectedPatient.reports?.map(r => <option key={r.id} value={r.id}>{r.date} (Wk {r.gestationalWeek})</option>)}
+                {selectedPatient.reports?.map((r: any) => <option key={r.id} value={r.id}>{new Date(r.createdAt).toLocaleDateString()}</option>)}
               </select>
             </div>
           </div>
@@ -496,8 +496,8 @@ const DoctorPortalPage: React.FC = () => {
                 <thead className="bg-gray-50 border-y border-border/50 text-muted uppercase text-[0.65rem] tracking-widest">
                   <tr>
                     <th className="px-4 py-3 font-bold">Biomarker</th>
-                    <th className="px-4 py-3 font-bold">Baseline ({r1?.date})</th>
-                    <th className="px-4 py-3 font-bold">Comparison ({r2?.date})</th>
+                    <th className="px-4 py-3 font-bold">Baseline ({compareResult?.reportA?.createdAt ? new Date(compareResult.reportA.createdAt).toLocaleDateString() : '?'})</th>
+                    <th className="px-4 py-3 font-bold">Comparison ({compareResult?.reportB?.createdAt ? new Date(compareResult.reportB.createdAt).toLocaleDateString() : '?'})</th>
                     <th className="px-4 py-3 font-bold text-right">Delta (%)</th>
                   </tr>
                 </thead>
@@ -508,8 +508,8 @@ const DoctorPortalPage: React.FC = () => {
                     return (
                       <tr key={i} className="hover:bg-gray-50/50">
                         <td className="px-4 py-3 font-bold text-foreground">{d.name}</td>
-                        <td className="px-4 py-3 text-muted">{d[r1!.date]}</td>
-                        <td className="px-4 py-3 text-foreground font-medium">{d[r2!.date]}</td>
+                        <td className="px-4 py-3 text-muted">{d[compareResult?.reportA?.createdAt]}</td>
+                        <td className="px-4 py-3 text-foreground font-medium">{d[compareResult?.reportB?.createdAt]}</td>
                         <td className="px-4 py-3 text-right">
                           <span className={`px-2 py-1 rounded-full text-xs font-bold ${
                             isZero ? 'bg-gray-100 text-gray-500' : 

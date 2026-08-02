@@ -22,9 +22,10 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
+  TooltipProps,
 } from 'recharts';
 import { Card } from '@/components/ui';
-import { calibrationData } from '@/data/calibrationData';
+import { useCalibrationData } from '@/hooks/queries';
 
 const PIPELINE_STEPS = [
   { icon: Camera, label: 'Image Capture' },
@@ -45,9 +46,9 @@ const BIOMARKER_TABS = [
 ];
 
 // Custom Tooltip for the chart
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
   if (active && payload && payload.length) {
-    const isUnknown = payload.some((p: any) => p.dataKey === 'unknownSample');
+    const isUnknown = payload.some(p => p.dataKey === 'unknownSample');
     return (
       <div className="bg-surface border border-border p-3 rounded-lg shadow-elevated">
         <p className="text-body-sm font-bold text-foreground mb-2">
@@ -68,16 +69,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 const CalibrationPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialBiomarker = searchParams.get('biomarker') || 'albumin';
-  const [selectedBiomarker, setSelectedBiomarker] = useState(
-    calibrationData[initialBiomarker] ? initialBiomarker : 'albumin'
-  );
-
-  // Sync state to URL when changed
-  useEffect(() => {
-    setSearchParams({ biomarker: selectedBiomarker }, { replace: true });
-  }, [selectedBiomarker, setSearchParams]);
-
-  const activeData = calibrationData[selectedBiomarker];
+  const sampleId = searchParams.get('sampleId');
+  const { data: activeData, isLoading } = useCalibrationData(selectedBiomarker, sampleId || undefined);
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-20">
@@ -176,6 +169,9 @@ const CalibrationPage: React.FC = () => {
         <div className="grid lg:grid-cols-4 gap-8">
           {/* Chart Area */}
           <div className="lg:col-span-3 h-[400px] sm:h-[500px] w-full relative">
+            {isLoading || !activeData ? (
+              <div className="w-full h-full flex items-center justify-center text-muted">Loading calibration data...</div>
+            ) : (
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -245,32 +241,37 @@ const CalibrationPage: React.FC = () => {
                 />
 
                 {/* Current Unknown Sample Highlight */}
-                <Scatter 
-                  name="Patient Sample" 
-                  data={[activeData.unknownSample]} 
-                  fill="#0f766e" 
-                  shape="circle"
-                  r={6}
-                  isAnimationActive={true}
-                  animationDuration={1000}
-                  animationBegin={1200}
-                />
+                {activeData.unknownSample && (
+                  <>
+                    <Scatter 
+                      name="Patient Sample" 
+                      data={[activeData.unknownSample]} 
+                      fill="#0f766e" 
+                      shape="circle"
+                      r={6}
+                      isAnimationActive={true}
+                      animationDuration={1000}
+                      animationBegin={1200}
+                    />
 
-                {/* Dashed projection lines for the unknown sample */}
-                <ReferenceLine 
-                  x={activeData.unknownSample.intensity} 
-                  stroke="#0f766e" 
-                  strokeDasharray="4 4" 
-                  segment={[{x: activeData.unknownSample.intensity, y: 0}, {x: activeData.unknownSample.intensity, y: activeData.unknownSample.concentration}]}
-                />
-                <ReferenceLine 
-                  y={activeData.unknownSample.concentration} 
-                  stroke="#0f766e" 
-                  strokeDasharray="4 4"
-                  segment={[{x: 0, y: activeData.unknownSample.concentration}, {x: activeData.unknownSample.intensity, y: activeData.unknownSample.concentration}]}
-                />
+                    {/* Dashed projection lines for the unknown sample */}
+                    <ReferenceLine 
+                      x={activeData.unknownSample.intensity} 
+                      stroke="#0f766e" 
+                      strokeDasharray="4 4" 
+                      segment={[{x: activeData.unknownSample.intensity, y: 0}, {x: activeData.unknownSample.intensity, y: activeData.unknownSample.concentration}]}
+                    />
+                    <ReferenceLine 
+                      y={activeData.unknownSample.concentration} 
+                      stroke="#0f766e" 
+                      strokeDasharray="4 4"
+                      segment={[{x: 0, y: activeData.unknownSample.concentration}, {x: activeData.unknownSample.intensity, y: activeData.unknownSample.concentration}]}
+                    />
+                  </>
+                )}
               </ComposedChart>
             </ResponsiveContainer>
+            )}
           </div>
 
           {/* Side Panel: Equation & Legend */}
@@ -278,8 +279,8 @@ const CalibrationPage: React.FC = () => {
             <div>
               <h3 className="text-xs font-bold text-muted uppercase tracking-widest mb-3">Regression Model</h3>
               <div className="bg-gray-50 p-4 rounded-xl border border-border/50">
-                <p className="font-mono text-lg font-bold text-foreground mb-1">{activeData.equation}</p>
-                <p className="text-sm font-medium text-success">R² = {activeData.rSquared}</p>
+                <p className="font-mono text-lg font-bold text-foreground mb-1">{activeData?.equation || '--'}</p>
+                <p className="text-sm font-medium text-success">R² = {activeData?.rSquared || '--'}</p>
               </div>
             </div>
 
@@ -295,35 +296,39 @@ const CalibrationPage: React.FC = () => {
                 <li className="flex items-center gap-3 text-sm text-foreground font-medium">
                   <div className="w-3 h-3 rounded-sm bg-[#e2e8f0]/60 border border-[#cbd5e1]" /> 95% Confidence Band
                 </li>
-                <li className="flex items-center gap-3 text-sm font-bold text-primary">
-                  <motion.div 
-                    className="w-3 h-3 rounded-full bg-primary relative"
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 1.2, type: "spring" }}
-                  >
+                {activeData?.unknownSample && (
+                  <li className="flex items-center gap-3 text-sm font-bold text-primary">
                     <motion.div 
-                      className="absolute inset-0 rounded-full bg-primary"
-                      animate={{ scale: [1, 1.8, 1], opacity: [0.5, 0, 0.5] }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                    />
-                  </motion.div>
-                  Patient Sample
-                </li>
+                      className="w-3 h-3 rounded-full bg-primary relative"
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 1.2, type: "spring" }}
+                    >
+                      <motion.div 
+                        className="absolute inset-0 rounded-full bg-primary"
+                        animate={{ scale: [1, 1.8, 1], opacity: [0.5, 0, 0.5] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      />
+                    </motion.div>
+                    Patient Sample
+                  </li>
+                )}
               </ul>
             </div>
 
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.5 }}
-              className="bg-primary/5 border border-primary/20 p-4 rounded-xl"
-            >
-              <h4 className="text-xs font-bold text-primary uppercase mb-1">Interpolated Result</h4>
-              <p className="text-sm text-foreground/80 leading-snug">
-                Measured intensity of <strong className="text-foreground">{activeData.unknownSample.intensity.toFixed(1)}</strong> maps to a concentration of <strong className="text-foreground">{activeData.unknownSample.concentration.toFixed(1)} {activeData.unit}</strong>.
-              </p>
-            </motion.div>
+            {activeData?.unknownSample && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 1.5 }}
+                className="bg-primary/5 border border-primary/20 p-4 rounded-xl"
+              >
+                <h4 className="text-xs font-bold text-primary uppercase mb-1">Interpolated Result</h4>
+                <p className="text-sm text-foreground/80 leading-snug">
+                  Measured intensity of <strong className="text-foreground">{activeData.unknownSample.intensity.toFixed(1)}</strong> maps to a concentration of <strong className="text-foreground">{activeData.unknownSample.concentration.toFixed(1)} {activeData.unit}</strong>.
+                </p>
+              </motion.div>
+            )}
           </div>
         </div>
       </Card>

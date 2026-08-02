@@ -34,8 +34,9 @@ import {
 } from 'recharts';
 import { Button, Card, Badge, ProgressBar } from '@/components/ui';
 import { useAppStore } from '@/store/useAppStore';
-import { BIOMARKERS, generateMockResult } from '@/data/biomarkers';
-import { mockPatient } from '@/data/mockData';
+import { BIOMARKERS } from '@/data/biomarkers';
+import { useReportDetails } from '@/hooks/queries';
+import apiClient from '@/lib/apiClient';
 
 // Map specific icons to biomarkers
 const getBiomarkerIcon = (key: string) => {
@@ -51,19 +52,21 @@ const getBiomarkerIcon = (key: string) => {
 };
 
 const getStatusColor = (status: string) => {
-  switch (status) {
+  switch (status.toLowerCase()) {
     case 'normal': return 'bg-success';
-    case 'abnormal': return 'bg-warning';
-    case 'severe': return 'bg-critical';
+    case 'mild': return 'bg-warning';
+    case 'high': return 'bg-critical';
+    case 'critical': return 'bg-critical';
     default: return 'bg-gray-300';
   }
 };
 
 const getStatusBadge = (status: string) => {
-  switch (status) {
+  switch (status.toLowerCase()) {
     case 'normal': return <Badge variant="success">Normal</Badge>;
-    case 'abnormal': return <Badge variant="warning">Abnormal</Badge>;
-    case 'severe': return <Badge variant="critical">Critical</Badge>;
+    case 'mild': return <Badge variant="warning">Mild</Badge>;
+    case 'high': return <Badge variant="critical">High</Badge>;
+    case 'critical': return <Badge variant="critical">Critical</Badge>;
     default: return <Badge>Unknown</Badge>;
   }
 };
@@ -82,8 +85,8 @@ const BiomarkerCard = ({
   reference 
 }: { 
   bKey: string; 
-  data: any; 
-  reference: any;
+  data: { value: number; unit: string; status: string; name: string }; 
+  reference: typeof BIOMARKERS[keyof typeof BIOMARKERS];
 }) => {
   const [expanded, setExpanded] = useState(false);
   const trend = Math.random(); // 0-1
@@ -134,9 +137,9 @@ const BiomarkerCard = ({
         
         <div className="mt-4 flex items-center justify-between">
           <p className="text-xs font-medium text-foreground/80 flex-1 truncate pr-2">
-            {data.status === 'normal' 
+            {data.status.toLowerCase() === 'normal' 
               ? 'Levels are within expected healthy ranges.'
-              : data.status === 'abnormal' 
+              : data.status.toLowerCase() === 'mild' 
                 ? 'Elevated levels detected. Close monitoring advised.'
                 : 'Critically out of range. Immediate clinical review required.'}
           </p>
@@ -191,40 +194,68 @@ const BiomarkerCard = ({
 
 const ResultsPage: React.FC = () => {
   const { id } = useParams();
-  const location = useLocation();
   const user = useAppStore((state) => state.user);
   
-  const [result, setResult] = useState<any>(null);
+  const { data: reportData, isLoading } = useReportDetails(id || '');
   const [docNote, setDocNote] = useState('');
 
-  useEffect(() => {
-    if (location.state && location.state.result) {
-      setResult(location.state.result);
-    } else {
-      setResult(generateMockResult());
-    }
-  }, [id, location.state]);
+  if (isLoading || !reportData) return <div className="min-h-screen flex items-center justify-center text-muted">Loading...</div>;
 
-  if (!result) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  // Transform backend report to frontend expected format
+  const report = reportData;
+  const biomarkersObj = report.sample?.biomarkerResults?.reduce((acc: any, b: any) => {
+    const key = b.biomarkerType.toLowerCase();
+    acc[key] = {
+      name: b.biomarkerType,
+      value: b.measuredValue,
+      unit: b.unit,
+      status: b.riskStatus
+    };
+    return acc;
+  }, {}) || {};
 
-  const hasCritical = Object.values(result.biomarkers).some((b: any) => b.status === 'severe');
-  const abnormalNames = Object.values(result.biomarkers)
-    .filter((b: any) => b.status !== 'normal')
-    .map((b: any) => b.name);
-
-  let aiSummary = "Analysis indicates all biomarkers are within expected healthy limits. No immediate physiological stress detected.";
-  if (abnormalNames.length > 0) {
-    aiSummary = `Analysis indicates abnormal concentrations of ${abnormalNames.join(' and ')}. `;
-    if (hasCritical) {
-      aiSummary += `This pattern strongly suggests acute clinical risk requiring immediate verification by a healthcare professional. `;
-    } else {
-      aiSummary += `This pattern suggests potential mild metabolic stress or early-stage indicators requiring closer monitoring. `;
-    }
-    aiSummary += `Other tested markers remain within expected physiological baselines.`;
+  const result = {
+    id: report.id,
+    date: report.createdAt,
+    riskScore: Math.round(report.overallRiskScore),
+    riskLabel: report.overallRiskScore > 66 ? 'CRITICAL' : report.overallRiskScore > 33 ? 'HIGH' : report.overallRiskScore > 0 ? 'MILD' : 'NORMAL',
+    biomarkers: biomarkersObj
+  };
+  
+  const patientDetails = {
+    name: report.sample?.patient?.user?.name || 'Unknown',
+    age: '--',
+    gestationalWeek: report.sample?.patient?.currentGestationalWeek || '--',
+    id: report.sample?.patient?.id || '--'
+  };
+  
+  if (report.sample?.patient?.dateOfBirth) {
+    const diff = Date.now() - new Date(report.sample.patient.dateOfBirth).getTime();
+    patientDetails.age = Math.abs(new Date(diff).getUTCFullYear() - 1970).toString();
   }
+
+  const hasCritical = Object.values(result.biomarkers).some((b: any) => b.status === 'CRITICAL' || b.status === 'HIGH');
+  
+  const aiSummary = report.aiSummary || 'Analysis indicates all biomarkers are within expected healthy limits. No immediate physiological stress detected.';
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!id) return;
+    try {
+      const response = await apiClient.get(`/reports/${id}/pdf`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `FEMFLOU_Report_${id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      console.error('Failed to download PDF', err);
+    }
   };
 
   return (
@@ -251,10 +282,10 @@ const ResultsPage: React.FC = () => {
           <div className="flex-1 bg-gray-50 p-4 rounded border border-gray-200">
             <h2 className="text-xs font-bold uppercase text-gray-500 mb-2">Patient Details</h2>
             <div className="grid grid-cols-2 gap-y-2 text-sm">
-              <p><strong>Name:</strong> {mockPatient.name}</p>
-              <p><strong>Age:</strong> {mockPatient.age}</p>
-              <p><strong>Gestational Wk:</strong> {mockPatient.gestationalWeek}</p>
-              <p><strong>ID:</strong> {mockPatient.id}</p>
+              <p><strong>Name:</strong> {patientDetails.name}</p>
+              <p><strong>Age:</strong> {patientDetails.age}</p>
+              <p><strong>Gestational Wk:</strong> {patientDetails.gestationalWeek}</p>
+              <p><strong>ID:</strong> {patientDetails.id}</p>
             </div>
           </div>
           
@@ -291,8 +322,8 @@ const ResultsPage: React.FC = () => {
                   <td className="py-2 text-gray-500 text-xs">{BIOMARKERS[key].ranges.normal}</td>
                   <td className="py-2">
                     <span className={`px-2 py-0.5 rounded text-xs font-bold ${
-                      data.status === 'normal' ? 'bg-green-100 text-green-800' :
-                      data.status === 'abnormal' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
+                      data.status.toLowerCase() === 'normal' ? 'bg-green-100 text-green-800' :
+                      data.status.toLowerCase() === 'mild' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
                     }`}>
                       {data.status.toUpperCase()}
                     </span>
@@ -369,8 +400,7 @@ const ResultsPage: React.FC = () => {
             <Button variant="outline" size="sm" leftIcon={<Share2 className="w-4 h-4" />}>
               Share
             </Button>
-            {/* Download PDF button also triggers the browser print dialog which has native PDF export */}
-            <Button size="sm" onClick={handlePrint} leftIcon={<FileDown className="w-4 h-4" />}>
+            <Button size="sm" onClick={handleDownloadPdf} leftIcon={<FileDown className="w-4 h-4" />}>
               Download PDF Report
             </Button>
           </div>
@@ -469,22 +499,17 @@ const ResultsPage: React.FC = () => {
                 <div>
                   <h4 className="text-xs font-bold text-muted uppercase mb-2">Recommendations</h4>
                   <ul className="text-sm text-foreground/80 space-y-2 list-disc list-inside">
-                    {hasCritical ? (
+                    {report.recommendations || (hasCritical ? (
                       <>
                         <li>Immediate clinical consult required</li>
                         <li>Hold regular diet pending physician review</li>
-                      </>
-                    ) : abnormalNames.length > 0 ? (
-                      <>
-                        <li>Increase hydration and monitor symptoms</li>
-                        <li>Schedule follow-up screening in 48 hours</li>
                       </>
                     ) : (
                       <>
                         <li>Maintain current prenatal care routine</li>
                         <li>Next routine screening in 2 weeks</li>
                       </>
-                    )}
+                    ))}
                   </ul>
                 </div>
                 <div className="bg-white/60 p-3 rounded-lg border border-white/80">

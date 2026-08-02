@@ -197,3 +197,11 @@ export const mockAppointments: Appointment[] = [
 
 export const currentRiskScore = 82;
 export const currentRiskLabel = 'Monitor';
+
+export const mockTrendData = [
+  { date: 'Sep 10', score: 88 },
+  { date: 'Sep 24', score: 85 },
+  { date: 'Oct 08', score: 84 },
+  { date: 'Oct 17', score: 85 },
+  { date: 'Oct 24', score: 82 },
+];

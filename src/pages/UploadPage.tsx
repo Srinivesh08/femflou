@@ -12,7 +12,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { Button, Card, ProgressBar } from '@/components/ui';
-import { generateMockResult } from '@/data/biomarkers';
+import { useUploadSample, useAnalyzeSample } from '@/hooks/queries';
 
 type UploadStep = 'upload' | 'camera' | 'preview' | 'processing';
 
@@ -51,6 +51,19 @@ const UploadPage: React.FC = () => {
   const [processIndex, setProcessIndex] = useState(0);
   const [confidence, setConfidence] = useState(0);
   const [processingTime, setProcessingTime] = useState(0);
+
+  const uploadMutation = useUploadSample();
+  const analyzeMutation = useAnalyzeSample();
+
+  // Helper to convert Data URL to Blob
+  const dataURLtoBlob = (dataurl: string) => {
+    let arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)![1],
+        bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+    while(n--){
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], {type:mime});
+  };
 
   // --- File Drag & Drop ---
   const handleDrop = (e: React.DragEvent) => {
@@ -131,11 +144,32 @@ const UploadPage: React.FC = () => {
     setStep('upload');
   };
 
-  const startAnalysis = () => {
+  const startAnalysis = async () => {
+    if (!imageSrc) return;
     setStep('processing');
     setProcessIndex(0);
     setConfidence(0);
     setProcessingTime(0);
+
+    try {
+      // 1. Upload
+      const blob = dataURLtoBlob(imageSrc);
+      const formData = new FormData();
+      formData.append('image', blob, 'cartridge.jpg');
+      
+      const uploadResult = await uploadMutation.mutateAsync(formData);
+      
+      // 2. Analyze
+      const analyzeResult = await analyzeMutation.mutateAsync(uploadResult.id);
+
+      // We still use the interval animation, but when it finishes, we navigate.
+      // Store the result ID to navigate to later.
+      (window as any).__reportIdToNavigate = analyzeResult.report.id;
+    } catch (error) {
+      console.error('Analysis failed:', error);
+      // Handle error (e.g. go back to preview)
+      setStep('preview');
+    }
   };
 
   // --- Processing Animation Sequence ---
@@ -154,8 +188,10 @@ const UploadPage: React.FC = () => {
             clearInterval(processTimer);
             // Finished!
             setTimeout(() => {
-              const mockResult = generateMockResult();
-              navigate(`/results/${mockResult.id}`, { state: { result: mockResult } });
+              const reportId = (window as any).__reportIdToNavigate;
+              if (reportId) {
+                navigate(`/results/${reportId}`);
+              }
             }, 1000);
             return prev;
           }

@@ -1,0 +1,56 @@
+import express, { Request, Response } from 'express';
+import cors from 'cors';
+import morgan from 'morgan';
+import helmet from 'helmet';
+import dotenv from 'dotenv';
+import path from 'path';
+import { errorHandler } from './middleware/errorHandler';
+import authRoutes from './routes/auth.routes';
+import patientRoutes from './routes/patient.routes';
+import sampleRoutes from './routes/sample.routes';
+import reportRoutes from './routes/report.routes';
+import calibrationRoutes from './routes/calibration.routes';
+import verifyRoutes from './routes/verify.routes';
+import alertRoutes from './routes/alert.routes';
+
+// Load environment variables
+dotenv.config();
+
+const app = express();
+const port = process.env.PORT || 4000;
+
+// Ensure JWT_SECRET is set
+if (!process.env.JWT_SECRET) {
+  console.error('FATAL ERROR: JWT_SECRET environment variable is not defined.');
+  process.exit(1);
+}
+
+// Middleware
+app.use(helmet());
+app.use(helmet.crossOriginResourcePolicy({ policy: "cross-origin" })); // Allow serving images across origins
+app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173' }));
+app.use(express.json());
+app.use(morgan('dev'));
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+// Routes
+app.get('/api/health', (req: Request, res: Response) => {
+  res.status(200).json({ status: 'ok' });
+});
+
+// Register routes here as they are created
+app.use('/api/auth', authRoutes);
+app.use('/api/patients', patientRoutes);
+app.use('/api/samples', sampleRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/calibration', calibrationRoutes);
+app.use('/api/verify', verifyRoutes);
+app.use('/api/alerts', alertRoutes);
+
+// Global Error Handler
+app.use(errorHandler);
+
+// Start Server
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
