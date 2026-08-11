@@ -55,7 +55,9 @@ const HistoryPage: React.FC = () => {
       riskScore: Math.round(r.overallRiskScore),
       riskLabel: r.overallRiskScore > 66 ? 'CRITICAL' : r.overallRiskScore > 33 ? 'HIGH' : r.overallRiskScore > 0 ? 'MILD' : 'NORMAL',
       biomarkers: r.sample?.biomarkerResults?.reduce((acc: any, b: any) => {
-        acc[b.biomarkerType.toLowerCase()] = b.measuredValue;
+        let key = b.biomarkerType.toLowerCase();
+        if (key === 'leukocyte_esterase') key = 'leukocyte';
+        acc[key] = b.measuredValue;
         return acc;
       }, {}) || {}
     })).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());

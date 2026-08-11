@@ -70,6 +70,7 @@ const CalibrationPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialBiomarker = searchParams.get('biomarker') || 'albumin';
   const sampleId = searchParams.get('sampleId');
+  const [selectedBiomarker, setSelectedBiomarker] = useState(initialBiomarker);
   const { data: activeData, isLoading } = useCalibrationData(selectedBiomarker, sampleId || undefined);
 
   return (

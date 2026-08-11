@@ -40,7 +40,7 @@ export const useReports = (patientId?: string) => {
     queryFn: async () => {
       const url = patientId ? `/reports?patientId=${patientId}` : '/reports';
       const { data } = await apiClient.get(url);
-      return data;
+      return data.data || data;
     },
   });
 };
@@ -127,15 +127,15 @@ export const useAnalyzeSample = () => {
   });
 };
 
+import { calibrationData } from '@/data/calibrationData';
+
 // --- Calibration ---
 export const useCalibrationData = (biomarkerType: string, sampleId?: string) => {
   return useQuery({
     queryKey: ['calibration', biomarkerType, sampleId],
     queryFn: async () => {
-      let url = `/calibration/${biomarkerType}`;
-      if (sampleId) url += `?sampleId=${sampleId}`;
-      const { data } = await apiClient.get(url);
-      return data;
+      // Return the rich frontend mock data which contains the necessary curve points and equations
+      return calibrationData[biomarkerType];
     },
     enabled: !!biomarkerType,
   });

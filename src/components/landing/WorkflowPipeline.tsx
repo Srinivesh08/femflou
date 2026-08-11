@@ -6,7 +6,7 @@ import {
   GitBranch,
   Sparkles,
   Camera,
-  CloudUpload,
+  Upload,
   ScanLine,
   Database,
   BrainCircuit,
@@ -60,7 +60,7 @@ const steps: PipelineStep[] = [
     bgColor: 'bg-secondary/10',
   },
   {
-    icon: CloudUpload,
+    icon: Upload,
     title: 'Secure Upload',
     description: 'Image transmitted via encrypted end-to-end secure channel.',
     color: 'text-secondary',

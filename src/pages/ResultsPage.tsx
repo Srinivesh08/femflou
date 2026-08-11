@@ -204,7 +204,8 @@ const ResultsPage: React.FC = () => {
   // Transform backend report to frontend expected format
   const report = reportData;
   const biomarkersObj = report.sample?.biomarkerResults?.reduce((acc: any, b: any) => {
-    const key = b.biomarkerType.toLowerCase();
+    let key = b.biomarkerType.toLowerCase();
+    if (key === 'leukocyte_esterase') key = 'leukocyte';
     acc[key] = {
       name: b.biomarkerType,
       value: b.measuredValue,
